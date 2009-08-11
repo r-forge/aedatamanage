@@ -1,0 +1,321 @@
+%\VignetteIndexEntry{Data Management of ArrayExpress Experiments at Local File System}
+%\VignetteKeywords{Data Management, ArrayExpress, Affymetrix}
+%\VignetteDepends{affy, ArrayExpress}
+%\VignettePackage{ArrayExpressDataManage}
+
+\newcommand{\Robject}[1]{{\texttt{#1}}}
+\newcommand{\Rfunction}[1]{{\texttt{#1}}}
+\newcommand{\Rpackage}[1]{{\textit{#1}}}
+\newcommand{\Rclass}[1]{{\textit{#1}}}
+\newcommand{\Rfunarg}[1]{{\textit{#1}}}
+
+\documentclass[12pt]{article}
+
+\usepackage[%
+baseurl={http://www.bioconductor.org},%
+pdftitle={Data Management of ArrayExpress Experiments at Local File System},%
+pdfauthor={Markus Schmidberger},%
+pdfsubject={arrayExpressDataManage},%
+pdfkeywords={Bioconductor},%
+plainpages,pdftex]{hyperref}
+
+ %nice urls
+\usepackage{url}
+\usepackage{natbib}
+\usepackage{lscape, longtable} %for landscape table
+\usepackage{rotating} 
+
+\SweaveOpts{keep.source=TRUE, eps=FALSE, eval=FALSE}
+
+\author{Markus Schmidberger
+	\footnote{Division of Biometrics and Bioinformatics, IBE, 
+	University of Munich, 81377 Munich, Germany}
+	\footnote{Package maintainer, Email: \texttt{schmidb@ibe.med.uni-muenchen.de}}
+	\and Ulrich Mansmann$^*$
+}
+
+\title{Description of the \Rpackage{ArrayExpressDataManage} package: Data Management of 
+ArrayExpress Experiments at Local File System}
+
+\begin{document}
+
+\maketitle \tableofcontents \newpage
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Abstract}
+The \Rpackage{ArrayExpressDataManage} package is part of the Bioconductor\footnote{\url{http://www.bioconductor.org/}} 
+\cite{Gentleman2004} project. The package extends the \Rpackage{ArrayExpress} package. 
+The \Rpackage{ArrayExpress}\cite{pkg:ArrayExpress} package is an interface to the 
+ArrayExpress (AE) Repository at EBI and builds Bioconductor data structures: 
+\Robject{ExpressionSet}, \Robject{AffyBatch}, \Robject{NChannelSet}. For more details 
+see the \Rpackage{ArrayExpress} vignettes.
+
+The \Rpackage{ArrayExpressDataManage} package offers data management of AE experiments 
+at the local file system and uses a optimized data structure. Thereby the data set can be 
+reused from anyone without providing the whole data set, e.g., as new experiment in AE. 
+The dataset can be regenerated very simply from the public available experiments in AE and 
+further experiments can be added to the data structure. The main function of the package 
+is the function \Rfunction{dapply()}, which is an apply-like function to apply a function FUN 
+to files in a directory structure.
+
+This is a hands-on introduction to the functionality of the \Rpackage{ArrayExpressDataManage} 
+package and uses a standard microarray analysis procedure to describe the functionality. 
+For more details about a standard analysis process for microarray data see for example 
+\cite{Gentleman2005}. 
+
+<<load Package, eval=T>>=
+library(ArrayExpressDataManage)
+@
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Changes to previous Versions} 
+For major changes see the NEWS file in the source code of the package or use the function 
+\Rfunction{readNEWS()}.
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Directory Structure at Local File System}
+The \Rpackage{ArrayExpressDataManage} package is based on the optimized 
+local file system data structure. To keep a clear data management, the raw data and 
+processed data are saved in a defined directory structure on the hard disk. In this 
+example the directory structure for a large cancer study is described:
+\begin{description}
+	\item[large-cancer-study] Top directory for the large cancer study.
+	\begin{description}
+		\item[Cancer-entity-XYZ] Every cancer entity has its own directory. All
+		experiments belonging to this entity will be stored in this directory.
+		\begin{description}
+			\item[Array.adf.txt] Array design description.
+			\item[Experiment-XYZ.raw.gz] Packed CEL files for one experiment.
+			\item[Experiment-XYZ.sdrf.txt] Detailed sample and data relationship 
+			annotation file for one experiment.
+			\item[Experiment-XYZ.idrf.txt] Investigation description for one experiment.
+			\item[Experiment-XYZ\_eset.Rdata] \Rpackage{R} objects of preprocessed experiment
+			data saved as binary Rdata file.
+		\end{description} 	
+		\item[Cancer-entity-XYZ\_eset.Rdata] \Rpackage{R} objects of all experiment data, 
+		belonging to cancer entity XYZ, preprocessed together and saved as binary Rdata file.	
+		\item[complete\_eset.Rdata] \Rpackage{R} objects of all experiment data 
+		preprocessed together and saved as binary Rdata file.
+	\end{description}
+\end{description} 
+This file structure is optimized for the data processing with the \Rpackage{R}
+language and for re-usability of intermediate results. For example, the preprocessed
+data are stored in the data structure or further results, e.g., graphs, can be stored, 
+too. The CEL files are only stored as packed files to save disk memory. This data 
+structure can be reused for other study types. The grouping into cancer entities can 
+be generalized to all other kinds of groups (for example age or sex).
+
+This simple example creates the data structure and downloads the two experiments 
+"E-GEOD-8003" and "E-GEOD-10097" from the AE database. These experiments are 
+assigned to the group "example".
+<<createDataStruct, eval=T>>=
+dir <- tempdir()
+data <- list(example=c("E-GEOD-8003", "E-GEOD-10097"))
+path <- createDataStruct(path = dir, data = data, 
+		name = "ArrayExpressData")
+@
+The \Rfunction{createDataStruct} creates a character object with the path location. 
+This object is required in most of the following functions.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The main Function: dapply()}
+The main function of the new package is the \Rfunction{dapply()} function.
+<<dapply, eval=T>>=
+res <- dapply(function(x) basename(x), 
+		path=path, pattern=".txt", recursive=TRUE)
+unlist(res)
+@
+This is an apply-like function which returns a list of values obtained 
+by applying a function \Robject{FUN} to files in a directory. The directory can be defined 
+by the variable \Robject{path} and the file type with a regular expression in the parameter 
+\Robject{pattern}.
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{A Standard Analysis Process for Microarray Data}
+Further functionality of the \Rpackage{ArrayExpressDataManage} package is described 
+with a standard microarray analysis procedure. For more details about a standard analysis 
+process for microarray data see for example \cite{Gentleman2005}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Statistic and Overview for the Experiments in the Data Structure}
+There are two useful functions to create some statistic about the experiments in the 
+data structure and an overview table about the experiments (see Table~\ref{tab:experiment_overview_small}):
+<<statistic, eval=T>>=
+create_statistic(path = path)
+@
+<<create_overview, eval=F>>=
+info <- create_overview(path=path)
+require(xtable)
+xinfo <- xtable(info, 
+	caption="Small selection of selected AE experiments", 
+	label="tab:experiment_overview_small", 
+	align="lllp{4cm}p{9cm}ll")
+print(xinfo, type="latex",
+	include.rownames=FALSE, append=FALSE,
+	latex.environments=c("tiny","center"),
+	floating.environment="sidewaystable", 
+	table.placement = "htp")
+@
+<<create_overview2, eval=T, echo=F, results=tex>>=
+info <- create_overview(path=path)
+require(xtable)
+xinfo <- xtable(info, caption="Small selection of selected ArrayExpress experiments.", 
+		label="tab:experiment_overview_small", align="lllp{4cm}p{9cm}ll")
+print(xinfo, type="latex",
+		include.rownames=FALSE, append=FALSE,
+		latex.environments=c("tiny","center"),
+		floating.environment="sidewaystable", 
+		table.placement = "htp")
+@
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Check for Duplicates}
+Using a lot of experiments from the AE database, there can be duplicate arrays in different 
+experiments. These arrays have to be removed from the analysis to omit unbalanced high-level 
+analysis
+<<check duplicates, eval=T>>=
+duplicateList <- checkForDuplicates(path = path)
+duplicateList
+@
+A list with duplicate arrays is returned, which can be manually removed or ignored in the 
+preprocessing. In this case there are no duplicates in the example data.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Quality Assessment \& Control}
+As next step the quality of the arrays should be assessed and controlled. For more 
+details see for example \cite{Gentleman2005, Hahne2008, Kauffmann2009}. A very useful package 
+for the quality control is \Rpackage{arrayQualityMetrics} package\cite{Kauffmann2009}. This package 
+can be used for the quality control of the experiments in the data structure.
+
+A function with the selected quality assessment method(s) has to be defined and the list 
+of outliers must be the return values. Then the function \Rfunction{qaComplete()} 
+for the complete quality control can be used.
+<<qaComplete, eval=T>>=
+qaFunBox <- function(x)
+{
+	library(arrayQualityMetrics)
+	obj <- x
+	prepdata<- aqm.prepdata(expressionset = obj, do.logtransform=T)
+	bo<- aqm.boxplot(obj, dataprep=prepdata)
+	return(bo$outliers$mean)
+}
+qa <- qaComplete(path = path, qaFun = qaFunBox)
+qa$out
+@
+The output is a list file with serveral infromation. The names of the arrays with bad 
+quality are stored in the \Robject{out} slot. In this case there is no array with bad 
+quality.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Preprocessing of Microarray Data}
+The next steps is the preprocessing of the raw data. It can be interesting to 
+preprocess all data together, to preprocess only data from one group or to 
+preprocess all experiment seperate. With the parameter \Rfunction{preprocessFUN} 
+the favored (complete) preprocessing function can be selected, e.g. rma, vsn or rmaPara 
+from the \Rpackage{affyPara}\cite{Schmidberger2009a} package.
+<<preprocess, eval=T>>=
+library(affy)
+esetC <- preprocessComplete(path = path, 
+		preprocessFUN = rma)
+esetC
+@
+<<preprocess2, eval=F, results=HIDE>>=
+esetG <- preprocessGroups(path = path, 
+		preprocessFUN = rma)
+@
+<<preprocess3, eval=F, results=HIDE>>=
+esetE <- preprocessExperiments(path = path, 
+		preprocessFUN = rma)
+@
+In this case the complete preprocessing and the preprocessing of the data from one group 
+it the same, because there is only one group.
+
+As you can see, the results are stored in the local file structure:
+<<dapply, eval=T>>=
+res <- dapply(function(x) basename(x), path=path, 
+	pattern=".Rdata", recursive=TRUE)
+unlist(res)
+@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Correct Batch Effect}
+Combining experiments from different labs in most cases involves a so called batch effect. 
+This non-biological experimental variation is commonly observed across multiple batches of 
+microarray experiments. For example, the a heatmap grafic can be used to visualize the 
+batch effect. Different methods habe been proposed to filter batch effects from data. All of 
+them have different advantages and drawbacks. This package provides a parametric 
+and non-parametric empirical Bayes framework called 'Combatting batch effects when combining 
+batches of gene expression microarray data' (ComBat) and developed from \cite{Johnson2007}. 
+It is robust to outliers in small (<10) sample sizes and performs comparable to 
+existing methods for large samples. It is the only algorithm correcting batch 
+effects, which is available in \Rpackage{R} code (\url{http://statistics.byu.edu/johnson/ComBat}). 
+Small changes of the code were required for the application to the latest Bioconductor 
+\Robject{ExpressionSet} object. 
+<<correctBatch, eval=F>>=
+eset_batch <- correctBatch(path = path)
+@
+Again, the results are stored in the local file structure and can be reused.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Nonspecific Filtering}
+Nonspecific filtering is a very common procedure after preprocessing and before high-level 
+analysis (see \cite{Hahne2008}). In this step the genes are filter for different criterias and only the intersting 
+genes are used for further analysis.
+<<filterExperiments, eval=T>>=
+filterExperiments(path = path)
+@
+Again, the results are stored in the local file structure and can be reused.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Some High-Level Analysis}
+There are a lot of different high-level analysis tools, which can be applied to the preprocessed 
+microarray data. This example demonstrates the analysis of correlation between genes.
+<<pcalg, eval=F>>=
+library(pcalg)
+graphs <- dapply(function(eset){
+	load(eset)
+	g <- pcAlgo( t( exprs(eSet)[50:100,] ), alpha=0.05 )
+	return(g)
+}, path=path, pattern="_eset.Rdata", recursive=TRUE)
+@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Clean Data Structure}
+After a lot of work it could be very useful to clean the data structure from temporary 
+saved results: 
+<<clean, eval=T>>=
+clean(path = path)
+@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
