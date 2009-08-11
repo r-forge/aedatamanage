@@ -1,0 +1,22 @@
+# R Package ArrayExpressDataManage - NEWS
+#
+# Copyright (C) 2009 : Markus Schmidberger <schmidb@ibe.med.uni-muenchen.de>
+###############################################################################
+
+ArrayExpressDataManage 0.3.0 (build 07. August 2009)
+* Documentation and vignette improved
+
+ArrayExpressDataManage 0.2.0 (build 30. July 2009)
+* Documentation improved
+* first version of vignette added
+
+ArrayExpressDataManage 0.1.0 (build 20. July August 2009)
+* Documentation added
+
+ArrayExpressDataManage 0.0.0 (build 15. February 2009)
+* Package created
+* Package contains the following functions:
+** dapply
+** createDataStructure
+** clean
+** creatOverview

@@ -1,0 +1,12 @@
+Package: ArrayExpressDataManage
+Version: 0.3.0
+Title: Data management functions for experiments available from ArrayExpress Repository at EBI. 
+Date: 2009-08-07
+Author: Markus Schmidberger <schmidb@ibe.med.uni-muenchen.de>, Ulrich Mansmann <mansmann@ibe.med.uni-muenchen.de>
+Maintainer: Markus Schmidberger <schmidb@ibe.med.uni-muenchen.de>
+Depends: R(>= 2.8.0), ArrayExpress(>= 1.3.7), tools, xtable, affy, genefilter, multicore
+Suggests: affyPara
+Description: The package contains function for data management at a local system for experiments available from ArrayExpress Repository at EBI.
+biocViews: Microarray, DataImport
+License: GPL version 3 or newer
+URL: http://www.ibe.med.uni-muenchen.de
