@@ -12,7 +12,7 @@ This package provides a parametric and non-parametric empirical Bayes framework 
 http://statistics.byu.edu/johnson/ComBat). 
 }
 \usage{
-ComBat(expression, sample_info, type = "txt", write = F, covariates = "all", par.prior = T, filter = F, skip = 0, prior.plots = T)
+ComBat(expression, sample_info, covariates = "all", par.prior = T, filter = F, skip = 0, prior.plots = T)
 }
 
 \arguments{
@@ -23,8 +23,6 @@ ComBat(expression, sample_info, type = "txt", write = F, covariates = "all", par
  names include batch and covariate (treatment) information. The batch column is required 
  and must be named 'Batch'. Note that currently ComBat only deals with categorical covariates. 
  Numerical covariates have not been implemented at this time. See http://statistics.byu.edu/johnson/ComBat/Usage.html}
-  \item{type}{File type for the expression values.}
-  \item{write}{A logical, if adjusted files are written to a file or not.}
   \item{covariates}{The covariates}
   \item{par.prior}{A logical, if parametric adjustment is used}
   \item{filter}{A logical for filter for presence/absence all in the data}
@@ -51,9 +49,10 @@ and W. Evan Johnson \email{evan@stat.byu.edu}}
 	library(affydata)
 	data(Dilution)
 	eSet <- rma(Dilution)
-	sample_info <- cbind(rownames(pData(e)), rownames(pData(e)), c(1,0,1,0))
+	sample_info <- cbind(rownames(pData(eSet)), rownames(pData(eSet)), c(1,0,1,0))
 	
 	sample_info <- pData(eSet)
+	sample_info[,1] <- rownames(sample_info)
 	colnames(sample_info) <- c("array", "sample", "Batch")
 		
 	exprs(eSet) <- ComBat( exprs(eSet), sample_info )	

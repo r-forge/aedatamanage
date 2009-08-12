@@ -12,36 +12,22 @@
 # angepasst für direkte Datenübergabe
 
 ComBat <- function(expression, 
-		sample_info, type='txt', write=F, 
+		sample_info,
 		covariates='all', par.prior=T, 
 		filter=F, skip=0, prior.plots=T)
 {
-	#debug: expression_xls='exp.txt'; sample_info_file='sam.txt'; type='txt'; write=T; covariates='all'; par.prior=T; filter=F; skip=0; prior.plots=T
-	cat('Reading Sample Information File\n')
-	#saminfo <- read.table(sample_info_file, header=T, sep='\t',comment.char='')
+	cat('Reading Sample Information\n')
 	saminfo <- sample_info
-	if(sum(colnames(saminfo)=="Batch")!=1){return('ERROR: Sample Information File does not have a Batch column!')}
+	if(sum(colnames(saminfo)=="Batch")!=1)
+		stop('ERROR: Sample Information does not have a Batch column!')
 	
-	cat('Reading Expression Data File\n')
-#	if(type=='csv'){
-#		dat <- read.csv(expression_xls,header=T,as.is=T)
-#		#print(dat[1:2,])
-#		#	dat <- dat[,trim.dat(dat)]  
-#		#print(colnames(dat))
-#		colnames(dat)=scan(expression_xls,what='character',nlines=1,sep=',',quiet=T)[1:ncol(dat)]
-#		#print(colnames(dat))
-#	}
-#	else{
-#		dat <- read.table(expression_xls,header=T,comment.char='',fill=T,sep='\t', as.is=T)
-#		dat <- dat[,trim.dat(dat)]
-#		colnames(dat)=scan(expression_xls,what='character',nlines=1,sep='\t',quiet=T)[1:ncol(dat)]
-#	}
+	# Reading Expression Data
 	dat <- expression
 	
 	if (skip>0){
 		geneinfo <- as.matrix(dat[,1:skip])
-		dat <- dat[,-c(1:skip)]}
-	else{geneinfo=NULL}
+		dat <- dat[,-c(1:skip)]
+	}else geneinfo=NULL
 	
 	if(filter){
 		ngenes <- nrow(dat)
@@ -49,17 +35,20 @@ ComBat <- function(expression,
 		present <- apply(dat, 1, .filter.absent, filter)
 		dat <- dat[present, -(2*(1:col))]
 		if (skip>0){geneinfo <- geneinfo[present,]}
-		cat('Filtered genes absent in more than',filter,'of samples. Genes remaining:',nrow(dat),'; Genes filtered:',ngenes-nrow(dat),'\n')
+		cat('Filtered genes absent in more than', filter, 'of samples. Genes remaining:', nrow(dat),'; Genes filtered:',ngenes-nrow(dat),'\n')
 	}
 	
-	if(any(apply(dat,2,mode)!='numeric')){return('ERROR: Array expression columns contain non-numeric values! (Check your .xls file for non-numeric values and if this is not the problem, make a .csv file and use the type=csv option)')}
+	if(any(apply(dat,2,mode)!='numeric'))
+		stop('ERROR: Array expression columns contain non-numeric values!')
 	
 	tmp <- match(colnames(dat),saminfo[,1])
-	if(any(is.na(tmp))){return('ERROR: Sample Information File and Data Array Names are not the same!')}
+	if(any(is.na(tmp)))
+		stop('ERROR: Sample Information and Data Array Names are not the same!')
 	tmp1 <- match(saminfo[,1],colnames(dat))
 	saminfo <- saminfo[tmp1[!is.na(tmp1)],]		
 	
-	if(any(covariates != 'all')){saminfo <- saminfo[,c(1:2,covariates)]}
+	if(any(covariates != 'all'))
+		saminfo <- saminfo[,c(1:2,covariates)]
 	design <- .design.mat(saminfo)	
 		
 	batches <- .list.batch(saminfo)
@@ -71,26 +60,40 @@ ComBat <- function(expression,
 		
 		## Check for missing values
 		NAs = any(is.na(dat))
-		if(NAs){cat(c('Found',sum(is.na(dat)),'Missing Data Values\n'),sep=' ')}
+		if(NAs)
+			cat(c('Found',sum(is.na(dat)),'Missing Data Values\n'),sep=' ')
 	
 		##Standardize Data across genes
 		cat('Standardizing Data across genes\n')
-		if (!NAs){B.hat <- solve(t(design)%*%design)%*%t(design)%*%t(as.matrix(dat))}else{B.hat=apply(dat,1,.Beta.NA,design)} #Standarization Model
+		if (!NAs)
+			B.hat <- solve(t(design)%*%design)%*%t(design)%*%t(as.matrix(dat))
+		else 
+			B.hat=apply(dat,1,.Beta.NA,design) #Standarization Model
 		grand.mean <- t(n.batches/n.array)%*%B.hat[1:n.batch,]
-		if (!NAs){var.pooled <- ((dat-t(design%*%B.hat))^2)%*%rep(1/n.array,n.array)}else{var.pooled <- apply(dat-t(design%*%B.hat),1,var,na.rm=T)}
+		if (!NAs)
+			var.pooled <- ((dat-t(design%*%B.hat))^2)%*%rep(1/n.array,n.array)
+		else 
+			var.pooled <- apply(dat-t(design%*%B.hat),1,var,na.rm=T)
 		
 		stand.mean <- t(grand.mean)%*%t(rep(1,n.array))
-		if(!is.null(design)){tmp <- design;tmp[,c(1:n.batch)] <- 0;stand.mean <- stand.mean+t(tmp%*%B.hat)}	
+		if(!is.null(design)){
+			tmp <- design
+			tmp[,c(1:n.batch)] <- 0
+			stand.mean <- stand.mean+t(tmp%*%B.hat)
+		}	
 		s.data <- (dat-stand.mean)/(sqrt(var.pooled)%*%t(rep(1,n.array)))
 		
 		##Get regression batch effect parameters
 		cat("Fitting L/S model and finding priors\n")
 		batch.design <- design[,1:n.batch]
-		if (!NAs){gamma.hat <- solve(t(batch.design)%*%batch.design)%*%t(batch.design)%*%t(as.matrix(s.data))}else{gamma.hat=apply(s.data,1,.Beta.NA,batch.design)}
+		if (!NAs)
+			gamma.hat <- solve(t(batch.design)%*%batch.design)%*%t(batch.design)%*%t(as.matrix(s.data))
+		else
+			gamma.hat=apply(s.data,1,.Beta.NA,batch.design)
 		delta.hat <- NULL
-		for (i in batches){
+		for (i in batches)
 			delta.hat <- rbind(delta.hat,apply(s.data[,i], 1, var,na.rm=T))
-		}
+		
 		
 		##Find Priors
 		gamma.bar <- apply(gamma.hat, 1, mean)
@@ -148,18 +151,8 @@ ComBat <- function(expression,
 		}
 		bayesdata <- (bayesdata*(sqrt(var.pooled)%*%t(rep(1,n.array))))+stand.mean
 		
-		if(write){
-			output_file <- paste('Adjusted',expression,'.xls',sep='_')
-			#print(geneinfo[1:2])
-			#print(bayesdata[1:2,1:4])
-			#cat(c(colnames(geneinfo),colnames(dat),'\n'),file=output_file,sep='\t')
-			#suppressWarnings(write.table(cbind(geneinfo,formatC(as.matrix(bayesdata), format = "f")), file=output_file, sep="\t", quote=F,row.names=F,col.names=F,append=T))
-			outdata <- cbind(ProbeID=geneinfo, bayesdata); 
-			write.table(outdata, file=output_file, sep="\t")
-			cat("Adjusted data saved in file:",output_file,"\n")
-		}else{
-			return(cbind(geneinfo,bayesdata))
-		}
+		return(cbind(geneinfo,bayesdata))
+		
 	}else{
 		#only one batch -> nothing todo
 		cat("No correction: only 1 Batch\n")
