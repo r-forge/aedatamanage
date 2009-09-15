@@ -14,5 +14,7 @@ dapply <- function(FUN, path=getwd(), pattern=NULL, recursive=TRUE, ...)
 	# list files
 	files <- list.files(path=path, pattern=pattern, recursive=recursive, full.names=T)
 	# run apply
-	return( lapply(files, FUN, ...) )	
+	res <- lapply(files, FUN, ...)
+	names(res) <- files
+	return( res )	
 }
